@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use ink_lang as ink;
-
+// test
 /**
 活动模板合约
 1. 创建活动，部署活动合约，并将创建的活动条件到主合
