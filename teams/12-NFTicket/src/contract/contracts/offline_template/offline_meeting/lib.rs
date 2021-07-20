@@ -599,48 +599,48 @@ pub mod offline_meeting {
 
 	}
 
-    // #[cfg(not(feature = "ink-experimental-engine"))]
-    // #[cfg(test)]
-    // mod tests {
-    //     /// Imports all the definitions from the outer scope so we can use them here.
-    //     use super::*;
+    #[cfg(not(feature = "ink-experimental-engine"))]
+    #[cfg(test)]
+    mod tests {
+        /// Imports all the definitions from the outer scope so we can use them here.
+        use super::*;
 
-    //     type Event = <Meeting as ::ink_lang::BaseEvent>::Type;
+        type Event = <Meeting as ::ink_lang::BaseEvent>::Type;
 
-    //     use ink_env::{DefaultEnvironment, call::{CreateBuilder, ExecutionInput, Selector, build_create}};
-    //     use ink_lang as ink;
+        use ink_env::{DefaultEnvironment, call::{CreateBuilder, ExecutionInput, Selector, build_create}};
+        use ink_lang as ink;
 
-    //     /// The default constructor does its job.
-    //     #[ink::test]
-    //     fn new_works() {
-	// 		let main_stub = FromAccountId::from_account_id(AccountId::from([0x01; 32]));
+        /// The default constructor does its job.
+        #[ink::test]
+        fn new_works() {
+			let main_stub = FromAccountId::from_account_id(AccountId::from([0x01; 32]));
 
-	// 		let mut meeting = Meeting::new(1,vec![79,80],vec![79,80],vec![79,80],vec![79,80],
-	// 			0,
-	// 			0,
-	// 			0,
-	// 			0,
-	// 			AccountId::from([0x01; 32]),
-	// 			main_stub,
-	// 			AccountId::from([0x01; 32]),);
-	// 		// let m1 =meeting.instantiate();
-    //         // Constructor works.
-	// 		// let meeting: Meeting = build_create::<DefaultEnvironment, Meeting>()
-	// 		// 	.code_hash(Hash::from([0x42; 32]))
-	// 		// 	.gas_limit(4000)
-	// 		// 	.endowment(25)
-	// 		// 	.exec_input(
-	// 		// 		ExecutionInput::new(Selector::new([0xDE, 0xAD, 0xBE, 0xEF]))
-	// 		// 			.push_arg(42)
-	// 		// 			.push_arg(true)
-	// 		// 			.push_arg(&[0x10u8; 32])
-	// 		// 	)
-	// 		// 	.salt_bytes(&[0xDE, 0xAD, 0xBE, 0xEF])
-	// 		// 	.params()
-	// 		// 	.instantiate()
-	// 		// 	.unwrap();
-	// 		meeting.add_zone(vec![79,80], 10, 20, 100000000000);
-    //     }
-    // }
+			let mut meeting = Meeting::new(1,vec![79,80],vec![79,80],vec![79,80],vec![79,80],
+				0,
+				0,
+				0,
+				0,
+				AccountId::from([0x01; 32]),
+				main_stub,
+				AccountId::from([0x01; 32]),);
+			// let m1 =meeting.instantiate();
+            // Constructor works.
+			// let meeting: Meeting = build_create::<DefaultEnvironment, Meeting>()
+			// 	.code_hash(Hash::from([0x42; 32]))
+			// 	.gas_limit(4000)
+			// 	.endowment(25)
+			// 	.exec_input(
+			// 		ExecutionInput::new(Selector::new([0xDE, 0xAD, 0xBE, 0xEF]))
+			// 			.push_arg(42)
+			// 			.push_arg(true)
+			// 			.push_arg(&[0x10u8; 32])
+			// 	)
+			// 	.salt_bytes(&[0xDE, 0xAD, 0xBE, 0xEF])
+			// 	.params()
+			// 	.instantiate()
+			// 	.unwrap();
+			meeting.add_zone(vec![79,80], 10, 20, 100000000000);
+        }
+    }
 
 }
