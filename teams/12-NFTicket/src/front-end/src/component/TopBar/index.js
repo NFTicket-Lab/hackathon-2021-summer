@@ -58,7 +58,7 @@ class TopBar extends Component {
         var pre=""
         var end =""
         if(address!=null){
-             pre=address.substr(0,4);
+             pre=address.substr(0,5);
              end = address.substr(address.length-4,4)
             console.log(address)
             return (<div className={styles.rightText}>
@@ -89,8 +89,8 @@ class TopBar extends Component {
         var flag = this.props.app.showaccountok
         return (
             <div className={styles.content}>
-                <SearchBar className={styles.searchBar} placeholder="Search" maxLength={8} />
-                <WhiteSpace className={styles.whiteSpace} />
+                {/* <SearchBar className={styles.searchBar} placeholder="Search" maxLength={8} /> */}
+                {/* <WhiteSpace className={styles.whiteSpace} /> */}
                 {/**
                  * 导航栏
                  */}

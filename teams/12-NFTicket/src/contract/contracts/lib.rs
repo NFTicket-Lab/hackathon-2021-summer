@@ -21,6 +21,7 @@ mod nfticket {
     #[cfg(not(feature = "ink-as-dependency"))]
     use super::*;
     use ink_env::call::FromAccountId;
+    use ink_prelude::collections::BTreeMap;
     use ink_prelude::format;
     use ink_prelude::vec::Vec;
     use ink_storage::collections::stash;
@@ -28,7 +29,7 @@ mod nfticket {
         collections::{hashmap::Keys, HashMap as StorageHashMap, Stash as StrorageStash},
         lazy::Lazy,
     };
-    use primitives::{MeetingStatus, Template, TicketNft};
+    use primitives::{MeetingStatus, Template, TickedStatus, TicketNft};
     use primitives::TemplateStatus;
     use primitives::Ticket;
     use primitives::{Meeting, MeetingError};
@@ -52,7 +53,8 @@ mod nfticket {
         template_map: StorageHashMap<AccountId, Template>,
         // 记录会议对应的classId
         classid_map:StorageHashMap<AccountId,ClassId>,
-        user_tickets: StorageHashMap<AccountId, Ticket>, // 用户拥有的门票.
+        // 用户拥有的门票.StorageHashMap<用户id, BTreeMap<(meeting_addr,ticket_id),Ticket>>
+        user_tickets: StorageHashMap<AccountId, BTreeMap<(AccountId,u32),Ticket>>, 
     }
 
     /// 模板创建事件
@@ -115,7 +117,6 @@ mod nfticket {
                 template_hash_address_map: Default::default(),
                 owner: caller,
                 fee_rate: (10, 100),
-                // fee_taker,
                 meeting_map: Default::default(),
                 template_map: Default::default(),
                 classid_map: Default::default(),
@@ -145,6 +146,11 @@ mod nfticket {
             self.ensure_owner();
             self.owner = new_owner;
             return true;
+        }
+
+        #[ink(message)]
+        pub fn get_owner(&self) -> AccountId {
+            self.owner
         }
 
         /**
@@ -334,8 +340,15 @@ mod nfticket {
         
         /// 返回用户的所有已经购买的票.
         #[ink(message)]
-        pub fn get_user_all_ticket(&self) -> Vec<(AccountId,Ticket)> {
-            self.user_tickets.iter().map(|(k,v)|(k.clone(),v.clone())).collect()
+        pub fn get_user_all_ticket(&self,user:AccountId) -> Vec<Ticket> {
+            let user_tiket_map = self.user_tickets.get(&user).unwrap();
+            user_tiket_map.iter().map(|(_,v)|v.clone()).collect()
+        }
+
+        #[ink(message)]
+        pub fn get_user_ticket(&self,user:AccountId,ticket_status:TickedStatus) -> Vec<Ticket> {
+            let user_tiket_map = self.user_tickets.get(&user).unwrap();
+            user_tiket_map.iter().map(|(_,v)|v.clone()).filter(|t|t.status==ticket_status).collect()
         }
 
 
@@ -368,28 +381,45 @@ mod nfticket {
         5. 更新成功，返回 true
         */
         #[ink(message)]
-        pub fn modify_meeting(&mut self, meeting_addr:AccountId, name: Vec<u8>, desc: Vec<u8>, 
-            poster: Vec<u8>, uri: Vec<u8>, start_time: u64, end_time: u64, start_sale_time: u64, end_sale_time: u64,
-            publisher:Vec<u8>,
-            min_price:u128,
+        pub fn modify_meeting(&mut self, meeting_addr:AccountId, name: Option<Vec<u8>>, desc: Option<Vec<u8>>, 
+            poster: Option<Vec<u8>>, uri: Option<Vec<u8>>, start_time: Option<u64>, end_time: Option<u64>, start_sale_time: Option<u64>, end_sale_time: Option<u64>,
+            publisher:Option<Vec<u8>>,
+            min_price:Option<u128>,
         )->bool{
             self.ensure_owner();
             let caller = Self::env().caller();
-            let my_meeting = Meeting {
-                meeting_addr,
-                name,
-                desc,
-                poster,
-                uri,
-                start_time,
-                end_time,
-                start_sale_time,
-                end_sale_time,
-                status:primitives::MeetingStatus::Active,
-                publisher,
-                min_price,
-            };
-            self.meeting_map.insert(meeting_addr, my_meeting);
+            let my_meeting = self.meeting_map.get_mut(&meeting_addr).unwrap();
+            if let Some(t)=name{
+				my_meeting.name = t;
+			}
+            if let Some(t)=desc{
+				my_meeting.desc = t;
+			}
+            if let Some(t)=poster{
+				my_meeting.poster = t;
+			}
+            if let Some(t)=uri{
+				my_meeting.uri = t;
+			}
+            if let Some(t)=start_time{
+				my_meeting.start_time = t;
+			}
+            if let Some(t)=end_time{
+				my_meeting.end_time = t;
+			}
+            if let Some(t)=start_sale_time{
+				my_meeting.start_sale_time = t;
+			}
+            if let Some(t)=end_sale_time{
+				my_meeting.end_sale_time = t;
+			}
+            if let Some(t)=publisher{
+				my_meeting.publisher = t;
+			}
+            if let Some(t)=min_price{
+				my_meeting.min_price = t;
+			}
+            
             Self::env().emit_event(MeetingModified {
                 meeting_addr: meeting_addr,
                 creator: caller,
@@ -406,7 +436,18 @@ mod nfticket {
         #[ink(message, payable)]
         pub fn buy_ticket(&mut self,creator:AccountId, _ticket: Ticket) -> Result<TicketNft,MeetingError> {
             ink_env::debug_message("-------------------------buy_ticket开始调用");
-            self.user_tickets.insert(creator, _ticket.clone());
+            let ticket_treemap = self.user_tickets.get_mut(&creator);
+            match ticket_treemap{
+                Some(ticketmap)=>{
+                    ticketmap.insert((_ticket.meeting.clone(),_ticket.ticket_id.clone()),_ticket.clone());
+                },
+                None=>{
+                    let mut ticketmap = BTreeMap::new();
+                    ticketmap.insert((_ticket.meeting.clone(),_ticket.ticket_id.clone()),_ticket.clone());
+                    self.user_tickets.insert(creator, ticketmap);
+                }
+            }
+            // self.user_tickets.insert(creator, _ticket.clone());
             let mut ticket_nft:TicketNft = Default::default();
             // 1. 调用本合约，必须付费，并且必须大于等于 min_ticket_fee
             let main_fee: Balance = self.env().transferred_balance();
@@ -421,7 +462,7 @@ mod nfticket {
                 // fn proxy_mint(creator: &ink_env::AccountId,to: &ink_env::AccountId,class_id: ClassId,metadata: Metadata,quantity: Quantity,charge_royalty: Option<bool>,) 
                 // -> (ink_env::AccountId, ink_env::AccountId, ClassId, TokenId, Quantity);
                 let (_class_owner, _ticket_owner, _class_id, token_id, quantity) = self.env().extension()
-                .proxy_mint(&creator,&_ticket.buyer, *calss_id, vec![1], 1,Some(false))
+                .proxy_mint(&creator,&_ticket.buyer, *calss_id, vec![1], 1,Some(false)) // TODO 第四个参数不清楚应该传啥
                 .map_err(|_|MeetingError::NftCallerError)?;
                 ticket_nft = TicketNft{
                     _class_owner,
@@ -429,6 +470,8 @@ mod nfticket {
                     _class_id,
                     token_id,
                     quantity,
+                    ticket_id:_ticket.ticket_id,
+                    meeting_addr: _ticket.meeting,
                 };
                 // 存储 token_id和数量
                 Self::env().emit_event(TicketSelled{
@@ -442,61 +485,13 @@ mod nfticket {
             return Ok(ticket_nft)
         }
 
-        /// 开始收费门票.
-        // #[ink(message, payable)]
-        // pub fn buy_ticket(&mut self, ticker: Hash, template_hash: Hash,maker:AccountId) -> Result<bool> {
-        //     let income: Balance = self.env().transferred_balance();
-        //     ink_env::debug_message(&format!("-------------------------received payment {:?}",income));
-        //     //做前置检查.判断大于0
-        //     assert!(income > 0, "income is negtive");
-        //     // 购买票,如果成功则返回需要的资金.
-        //     //根据template_id查询template合约地址.
-        //     ink_env::debug_message(&format!("-------------------------template_hash is {:?}",template_hash));
-        //     let template_address: &AccountId =
-        //         self.template_hash_address_map.get(&template_hash).unwrap();
-        //     ink_env::debug_message(&format!("-------------------------template_address {:?}",*template_address));
-        //     let mut template: MainStub = FromAccountId::from_account_id(*template_address);
-        //     ink_env::debug_message(&format!("-------------------------template {:?}",template));
-        //     let ticket_price_result = template.buy_ticket(ticker);
-        //     ink_env::debug_message(&format!("-------------------------ticket_price_result {:?}",ticket_price_result));
-        //     let result= match ticket_price_result {
-        //         Ok(ticker_result) => {
-        //             //开始扣除资金.
-        //             assert!(income >= ticker_result.price,"not enough money!");
-        //             // 计算需要的手续费
-        //             let fee: Balance = ticker_result.price.checked_mul(Balance::from(self.fee_rate.0)).unwrap().checked_div(Balance::from(self.fee_rate.1)).unwrap();
-        //             // 把资金按照百分比给资金转给资金账户
-        //             let trans=self.env().transfer(self.fee_taker, fee);
-        //             if let Err(_) = trans{
-        //                 return Err(MeetingError::TransferError);
-        //             }
-        //             //将买票的收入转账给发布活动的账户.
-        //             let contract_fee = ticker_result.price.checked_sub(fee).unwrap();
-        //             // self.env().transfer(ticker_result.maker, contract_fee);
-        //             self.env().transfer(maker, contract_fee);
-        //             Ok(true)
-        //         }
-        //         Err(_) => Err(MeetingError::CallBuyTickerError),
-        //         // Err(_) => panic!("call buy ticker error!"),
-        //     };
-        //     return result;
-        // }
+        /// 验票成功后,修改ticket的状态,只能由对应的会议调用.
+        #[ink(message)]
+        pub fn update_ticket_sell_status(&mut self,user:AccountId,meeting_addr: AccountId,ticket_id:u32,status:TickedStatus)->bool{
+            self.user_tickets.get_mut(&user).unwrap().get_mut(&(meeting_addr,ticket_id)).unwrap().status=status;
+            true
+        }
 
-        // /// 添加合约的id和hash值
-        // #[ink(message)]
-        // pub fn add_template_hash(&mut self, hash: Hash, template_address: AccountId) -> bool {
-        //     let value = self
-        //         .template_hash_address_map
-        //         .insert(hash, template_address);
-        //     if let None = value {
-        //         //如果该key不存在,返回true
-        //         true
-        //     } else {
-        //         false
-        //     }
-        // }
-
-        
 
         /// Panic if `owner` is not an owner,
         fn ensure_owner(&self) {
@@ -533,6 +528,20 @@ mod nfticket {
             // Constructor works.
             let meeting = NftTicket::new();
 			meeting.test_block_time();
+        }
+
+        #[ink::test]
+        fn test_modify_meeting() {
+            let account1=AccountId::from([0x01; 32]);
+            // Constructor works.
+            let mut meeting = NftTicket::new();
+			meeting.add_meeting(account1, account1, "name".as_bytes().to_vec(), "你好,我是一个小偷".as_bytes().to_vec(), "poster".as_bytes().to_vec(),
+             "uri".as_bytes().to_vec(), 1, 1, 1, 1, "publisher".as_bytes().to_vec(), 1).expect("add meeting error");
+            let m1 = meeting.meeting_map.get(&account1).unwrap();
+            println!("m1 is {:?}",m1);
+            meeting.modify_meeting(account1, Some("namf1".as_bytes().to_vec()), None, None, None, None, None, None, None, None, None);
+            let m2 = String::from_utf8(meeting.meeting_map.get(&account1).unwrap().desc.clone()).unwrap();
+            println!("m2 is {:?}",m2);
         }
     }
 }
